@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Convert sb3 to Extendable Blocks</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    }
+
+    html {
+      background-color: #1e1e1e;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      color: white;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      margin: 0;
+    }
+
+    header {
+      background-color: #ff5726;
+      margin: -10px;
+      margin-bottom: 10px;
+      padding: 10px;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <header style="background-color: #ff5726;">
+    <h2>Convert sb3: old blocks to extendable blocks</h2>
+  </header>
+  <input type="file" id="fileInput" accept=".sb3">
+  <button id="convertBtn" disabled>Convert & Download</button>
+  <pre id="log"></pre>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    const log = document.getElementById('log');
+    const fileInput = document.getElementById('fileInput');
+    const convertBtn = document.getElementById('convertBtn');
+
+    function logMsg(msg) {
+      log.textContent += msg + '\n';
+    }
+
+    let loadedZip = null;
+    let loadedName = '';
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      loadedName = file.name.replace(/\.sb3$/i, '') + '_extendable.sb3';
+      loadedZip = await JSZip.loadAsync(file);
+      logMsg(`Loaded: ${file.name}`);
+      const projectJson = loadedZip.file('project.json');
+      if (!projectJson) {
+        logMsg('ERROR: no project.json found');
+        convertBtn.disabled = true;
+        return;
+      }
+      const content = await projectJson.async('string');
+      const project = JSON.parse(content);
+      let count = 0;
+      for (const target of project.targets) {
+        if (!target.blocks) continue;
+        for (const [blockId, block] of Object.entries(target.blocks)) {
+          if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+          if (convertBlock(block)) count++;
+        }
+      }
+      logMsg(`Converted ${count} block(s)`);
+      loadedZip.file('project.json', JSON.stringify(project));
+      convertBtn.disabled = false;
+    });
+
+    convertBtn.addEventListener('click', async () => {
+      if (!loadedZip) return;
+      const blob = await loadedZip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = loadedName;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      logMsg(`Downloaded: ${loadedName}`);
+      convertBtn.disabled = true;
+    });
+
+    const RULES = [
+      {
+        old: 'operator_add',
+        new: 'operator_add_extendable',
+        extField: 'NUMS',
+        extCount: 2,
+        map: { NUM1: 'NUMS_0_NUM', NUM2: 'NUMS_1_NUM' }
+      },
+      {
+        old: 'operator_subtract',
+        new: 'operator_subtract_extendable',
+        extField: 'NUMS',
+        extCount: 2,
+        map: { NUM1: 'NUMS_0_NUM', NUM2: 'NUMS_1_NUM' }
+      },
+      {
+        old: 'operator_multiply',
+        new: 'operator_multiply_extendable',
+        extField: 'NUMS',
+        extCount: 2,
+        map: { NUM1: 'NUMS_0_NUM', NUM2: 'NUMS_1_NUM' }
+      },
+      {
+        old: 'operator_divide',
+        new: 'operator_divide_extendable',
+        extField: 'NUMS',
+        extCount: 2,
+        map: { NUM1: 'NUMS_0_NUM', NUM2: 'NUMS_1_NUM' }
+      },
+      {
+        old: 'operator_power',
+        extField: 'NUMS',
+        extCount: 2,
+        map: { NUM1: 'NUMS_0_NUM', NUM2: 'NUMS_1_NUM' }
+      },
+      {
+        old: 'operator_lt',
+        new: 'operator_lt_extendable',
+        extField: 'OPERANDS',
+        extCount: 2,
+        map: { OPERAND1: 'OPERANDS_0_OPERAND', OPERAND2: 'OPERANDS_1_OPERAND' }
+      },
+      {
+        old: 'operator_equals',
+        new: 'operator_equals_extendable',
+        extField: 'OPERANDS',
+        extCount: 2,
+        map: { OPERAND1: 'OPERANDS_0_OPERAND', OPERAND2: 'OPERANDS_1_OPERAND' }
+      },
+      {
+        old: 'operator_gt',
+        new: 'operator_gt_extendable',
+        extField: 'OPERANDS',
+        extCount: 2,
+        map: { OPERAND1: 'OPERANDS_0_OPERAND', OPERAND2: 'OPERANDS_1_OPERAND' }
+      },
+      {
+        old: 'operator_and',
+        new: 'operator_and_extendable',
+        extField: 'OPERANDS',
+        extCount: 2,
+        map: { OPERAND1: 'OPERANDS_0_OPERAND', OPERAND2: 'OPERANDS_1_OPERAND' }
+      },
+      {
+        old: 'operator_or',
+        new: 'operator_or_extendable',
+        extField: 'OPERANDS',
+        extCount: 2,
+        map: { OPERAND1: 'OPERANDS_0_OPERAND', OPERAND2: 'OPERANDS_1_OPERAND' }
+      },
+      {
+        old: 'operator_join',
+        new: 'operator_join_extendable',
+        extField: 'STRINGS',
+        extCount: 2,
+        map: { STRING1: 'STRINGS_0_STRING', STRING2: 'STRINGS_1_STRING' }
+      },
+      {
+        old: 'control_if',
+        new: 'control_if_extendable',
+        extField: 'BRANCHES',
+        extCount: 1,
+        map: { CONDITION: 'BRANCHES_0_CONDITION', SUBSTACK: 'SUBSTACKBRANCHES_0_BRANCH' }
+      },
+      {
+        old: 'control_if_else',
+        new: 'control_if_else_extendable',
+        extField: 'BRANCHES',
+        extCount: 1,
+        map: { CONDITION: 'BRANCHES_0_CONDITION', SUBSTACK: 'SUBSTACKBRANCHES_0_BRANCH', SUBSTACK2: 'ELSE_BRANCH' }
+      },
+      { old: 'json_new_object', new: 'json_object' },
+      { old: 'json_new_array', new: 'json_array' },
+      {
+        old: 'json_merge_object',
+        extField: 'ITEMS',
+        extCount: 2,
+        map: { OBJ1: 'ITEMS_0_ITEM', OBJ2: 'ITEMS_1_ITEM' }
+      },
+      {
+        old: 'json_merge_array',
+        extField: 'ITEMS',
+        extCount: 2,
+        map: { ARR1: 'ITEMS_0_ITEM', ARR2: 'ITEMS_1_ITEM' }
+      },
+      {
+        old: 'json_add_item',
+        extField: 'ITEMS',
+        extCount: 1,
+        map: { ITEM: 'ITEMS_0_ITEM' }
+      }
+    ];
+
+    function convertBlock(block) {
+      const opcode = block.opcode;
+      if (!opcode) return false;
+
+      for (const rule of RULES) {
+        if (opcode !== rule.old) continue;
+
+        if (rule.new) {
+          block.opcode = rule.new;
+        }
+
+        if (!rule.extField) return true;
+
+        if (!block.inputs) block.inputs = {};
+        if (!block.fields) block.fields = {};
+
+        block.fields[rule.extField] = [String(rule.extCount)];
+
+        if (rule.map) {
+          const snapshot = {};
+          for (const [oldName] of Object.entries(rule.map)) {
+            if (Object.prototype.hasOwnProperty.call(block.inputs, oldName)) {
+              snapshot[oldName] = block.inputs[oldName];
+            }
+          }
+          for (const oldName of Object.keys(snapshot)) {
+            delete block.inputs[oldName];
+          }
+          for (const [oldName, newName] of Object.entries(rule.map)) {
+            if (Object.prototype.hasOwnProperty.call(snapshot, oldName)) {
+              block.inputs[newName] = snapshot[oldName];
+            }
+          }
+        }
+
+        return true;
+      }
+
+      return false;
+    }
+  </script>
+</body>
+
+</html>
