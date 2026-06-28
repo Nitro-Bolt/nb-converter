@@ -4,41 +4,13 @@
 <head>
   <meta charset="UTF-8">
   <title>Convert sb3 to Extendable Blocks</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      padding: 0;
-      margin: 0;
-      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
-    }
-
-    html {
-      background-color: #1e1e1e;
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
-      color: white;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 10px;
-      margin: 0;
-    }
-
-    header {
-      background-color: #ff5726;
-      margin: -10px;
-      margin-bottom: 10px;
-      padding: 10px;
-      width: 100%;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
   <header style="background-color: #ff5726;">
     <h2>Convert sb3: old blocks to extendable blocks</h2>
+    <p>Converts blocks like normal if to extendable if and turns old JSON blocks into new ones.</p>
   </header>
   <input type="file" id="fileInput" accept=".sb3">
   <button id="convertBtn" disabled>Convert & Download</button>
@@ -72,14 +44,19 @@
       const content = await projectJson.async('string');
       const project = JSON.parse(content);
       let count = 0;
-      for (const target of project.targets) {
+      for (const target of project?.targets) {
         if (!target.blocks) continue;
+        let targetCount = 0;
         for (const [blockId, block] of Object.entries(target.blocks)) {
           if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
-          if (convertBlock(block)) count++;
+          if (convertBlock(block)) {
+            count++;
+            targetCount++;
+          }
         }
+        logMsg(`- ${target.name}: Converted ${targetCount} block(s)`);
       }
-      logMsg(`Converted ${count} block(s)`);
+      logMsg(`Converted ${count} block(s) across ${project?.targets?.length ?? 0} sprite(s)`);
       loadedZip.file('project.json', JSON.stringify(project));
       convertBtn.disabled = false;
     });
@@ -185,7 +162,7 @@
         new: 'control_if_else_extendable',
         extField: 'BRANCHES',
         extCount: 1,
-        map: { CONDITION: 'BRANCHES_0_CONDITION', SUBSTACK: 'SUBSTACKBRANCHES_0_BRANCH', SUBSTACK2: 'ELSE_BRANCH' }
+        map: { CONDITION: 'BRANCHES_0_CONDITION', SUBSTACK: 'SUBSTACKBRANCHES_0_BRANCH', SUBSTACK2: 'SUBSTACKELSE_BRANCH' }
       },
       { old: 'json_new_object', new: 'json_object' },
       { old: 'json_new_array', new: 'json_array' },
